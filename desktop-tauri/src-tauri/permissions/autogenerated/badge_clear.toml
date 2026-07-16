@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-badge-clear"
+description = "Enables the badge_clear command without any pre-configured scope."
+commands.allow = ["badge_clear"]
+
+[[permission]]
+identifier = "deny-badge-clear"
+description = "Denies the badge_clear command without any pre-configured scope."
+commands.deny = ["badge_clear"]

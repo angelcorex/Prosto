@@ -1,0 +1,11 @@
+export { StatusDot } from './status-dot';
+export { LiveStatusDot } from './live-status-dot';
+export { AvatarWithStatus } from './avatar-with-status';
+export { DeviceBadge } from './device-badge';
+export { detectDevice } from './device';
+export type { DeviceKind } from './device';
+export { useHeartbeat } from './use-heartbeat';
+export { usePresence } from './use-presence-store';
+export { publishPresence, markOnline, markOffline, seedPresence, getPresence, usePresenceTick } from './use-presence-store';
+export { effectiveStatus, lastSeenLabel, STATUS_COLOR } from './presence';
+export type { PresenceStatus } from './presence';

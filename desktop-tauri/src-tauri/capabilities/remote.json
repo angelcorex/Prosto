@@ -1,0 +1,32 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "remote",
+  "description": "Grants the remote Prosto web app (loaded in the main + popout windows) access to the window/notification/updater commands and the app's own bridge commands. Tauri v2.11+ requires remote origins to be explicitly ACL-allowed, otherwise EVERY invoke() from prosto.ink is rejected (dead titlebar buttons + splash that only clears via the failsafe).",
+  "windows": ["main", "popout-*"],
+  "remote": {
+    "urls": ["https://prosto.ink", "https://*.prosto.ink"]
+  },
+  "permissions": [
+    "core:window:allow-minimize",
+    "core:window:allow-maximize",
+    "core:window:allow-unmaximize",
+    "core:window:allow-is-maximized",
+    "core:window:allow-hide",
+    "core:window:allow-show",
+    "core:window:allow-set-focus",
+    "core:window:allow-set-overlay-icon",
+    "core:webview:allow-create-webview-window",
+    "notification:default",
+    "updater:default",
+    "allow-win-minimize",
+    "allow-win-toggle-maximize",
+    "allow-win-close",
+    "allow-win-is-maximized",
+    "allow-badge-set",
+    "allow-badge-clear",
+    "allow-notify",
+    "allow-popout",
+    "allow-app-ready",
+    "allow-open-external"
+  ]
+}

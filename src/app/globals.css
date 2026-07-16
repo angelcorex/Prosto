@@ -1,0 +1,696 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    /* Remove the default border-border rule — no borders unless explicit */
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+    scrollbar-gutter: stable;
+    /* iOS: kill the grey tap flash for a native feel */
+    -webkit-tap-highlight-color: transparent;
+    /* Disable double-tap / pinch zoom for an app-like feel */
+    touch-action: manipulation;
+    /* Don't let the page itself rubber-band / drag (app-like) */
+    overscroll-behavior: none;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+    /* Lock the page itself — no rubber-band / drag of the whole app on touch */
+    overscroll-behavior: none;
+    position: relative;
+  }
+  html {
+    overscroll-behavior: none;
+  }
+
+  /* ── Global horizontal-overflow guard ──
+     Nothing should ever scroll the page sideways or push content off-screen
+     (a recurring issue on the docs/admin pages on phones). `overflow-x: clip`
+     hides horizontal spill WITHOUT creating a scroll container — so unlike
+     `overflow: hidden` it doesn't break `position: sticky` descendants (docs
+     sidebar) or vertical scrolling. Intentional horizontal scrollers (e.g. the
+     admin users table, code blocks) opt back in with their own `overflow-x-auto`
+     on an inner wrapper, which still works inside a clipped ancestor. */
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  /* ── Touch press feedback ──
+     On touch devices `hover:` styles never apply, so taps feel unresponsive.
+     Give interactive elements a subtle, instant pressed state so the UI feels
+     alive (like Twitter/Instagram row & button presses). */
+  @media (hover: none) {
+    a:active,
+    button:active,
+    [role='button']:active,
+    label:active {
+      opacity: 0.6;
+      transition: opacity 0.04s ease;
+    }
+  }
+
+  /* ── iOS / installed PWA ──
+     Respect the notch and status bar. We inset the top/left/right at the root;
+     the BOTTOM inset is intentionally NOT applied here — fixed bottom chrome
+     (mobile tab bar) and scroll containers handle the home-indicator clearance
+     themselves, so adding it at the root too would double the gap and push the
+     whole UI far up the screen. */
+  @supports (padding: max(0px)) {
+    .pwa-safe {
+      padding-top: env(safe-area-inset-top);
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+    }
+  }
+
+  /* iOS zooms when a focused input is under 16px — pin the base size on phones.
+     Covers real form controls AND contentEditable rich inputs (message /
+     composer fields) which otherwise carry an explicit sub-16px text size that
+     the browser honours for zoom. `!important` beats the utility text-[15px]. */
+  @media (max-width: 768px) {
+    input,
+    textarea,
+    select,
+    [contenteditable='true'] {
+      font-size: 16px !important;
+    }
+  }
+
+  /* ── Mobile bottom-nav clearance — single source of truth ──
+     The floating tab bar is 56px tall and sits 8px above the screen edge, so a
+     scroll container needs (56 + 8 + 8 + safe-area) of bottom clearance for its
+     last row to clear the bar. Every screen uses `pb-bottom-nav` (below) or the
+     `--bottom-nav-space` var directly — never a hand-rolled `pb-[calc(...)]`,
+     so the bar height and content padding can never drift apart again. */
+  :root {
+    --bottom-nav-space: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* ── Touch-reveal ──
+     Tailwind's `hoverOnlyWhenSupported` means `group-hover:` never fires on a
+     touchscreen, so controls hidden until hover (post menu, row actions, channel
+     gears) are invisible on phones. Elements marked `touch-reveal` are hidden at
+     rest on hover-capable pointers (revealed by their group's hover) but ALWAYS
+     shown on touch devices, where there is no hover to reveal them. */
+  @media (hover: none) {
+    .touch-reveal {
+      opacity: 1 !important;
+      visibility: visible !important;
+      display: flex !important;
+    }
+  }
+
+  /* Hide the browser's native password reveal/clear icons (Edge/IE) so only
+     our custom show/hide eye is shown — otherwise there are two eyes. */
+  input::-ms-reveal,
+  input::-ms-clear {
+    display: none;
+  }
+
+  /* ── Desktop (Electron) chrome ──
+     The custom title bar is a fixed 32px strip; reserve room for it so the
+     full-height shell sits below it. Scoped to `.desktop-chrome` (added by the
+     title bar on mount) so browser users are never affected. */
+  html.desktop-chrome body {
+    padding-top: 32px;
+  }
+  html.desktop-chrome .h-dvh {
+    height: calc(100dvh - 32px);
+  }
+  html.desktop-chrome .min-h-dvh {
+    min-height: calc(100dvh - 32px);
+  }
+
+  /* ── Full-screen overlay top inset ──
+     Fixed overlays (image viewer, video modal) paint above the desktop title
+     bar and the mobile status bar, so their top controls must clear that
+     chrome. This inset is 0 in a normal browser, 32px in the desktop client,
+     and the safe-area inset on iOS. Single source of truth for both. */
+  :root { --overlay-top-inset: env(safe-area-inset-top, 0px); }
+  html.desktop-chrome { --overlay-top-inset: 32px; }
+
+  /* Floating close button pinned to the top-right of a full-screen overlay. */
+  .overlay-close-btn {
+    position: absolute;
+    top: calc(var(--overlay-top-inset) + 0.75rem);
+    right: 0.75rem;
+  }
+  /* Top toolbar of a full-screen overlay — same clearance, applied as padding. */
+  .overlay-top-safe {
+    padding-top: calc(var(--overlay-top-inset) + 0.75rem);
+  }
+
+  :focus-visible {
+    @apply outline-none;
+  }
+
+  /* ── Selection & drag discipline ──
+     UI chrome — buttons, labels, navigation, rails/sidebars — and all media
+     (logos, icons, avatars, banners, server/channel art) must not be
+     text-selectable or drag-ghosted, so the app feels native and a stray drag
+     never highlights a button label or peels an image off the page. Real
+     content (messages, posts, captions) lives in <main>/content nodes and
+     stays selectable; anything that needs selecting back can opt in with the
+     Tailwind `select-text` utility (utilities layer wins over these base
+     rules). */
+  button,
+  [role='button'],
+  label,
+  nav,
+  aside {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+  }
+  img,
+  svg {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+
+  /* ── Skeleton pulse — very subtle fade so it doesn't distract ── */
+  @keyframes skeleton-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.45; }
+  }
+
+  .animate-skeleton {
+    background-color: hsl(var(--accent));
+    animation: skeleton-pulse 1.8s ease-in-out infinite;
+  }
+
+  /* ── Deferred skeleton screen ──
+     Stays invisible for 150ms so fast (cached) navigations never flash a
+     skeleton at all. Fades in only for genuinely slow loads. */
+  .deferred-skeleton {
+    opacity: 0;
+    animation: skeleton-appear 200ms ease-out 150ms forwards;
+  }
+  @keyframes skeleton-appear {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .deferred-skeleton { animation-delay: 0ms; }
+  }
+
+  /* ── Typing dots ── smooth bounce with a soft scale */
+  @keyframes typing-dot {
+    0%, 60%, 100% { transform: translateY(0) scale(0.85);   opacity: 0.35; }
+    30%           { transform: translateY(-4px) scale(1);   opacity: 1;    }
+  }
+
+  .typing-dot {
+    animation: typing-dot 1.3s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  }
+  .typing-dot:nth-child(2) { animation-delay: 0.18s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.36s; }
+
+  /* ── Jump-to-message flash — when opening a mention notification ── */
+  @keyframes jump-flash {
+    0%, 60% { background-color: hsl(var(--link) / 0.16); }
+    100%    { background-color: transparent; }
+  }
+  .jump-highlight {
+    animation: jump-flash 2.4s ease-out;
+  }
+
+  /* ── Call speaking ripple — expands outward in rings ── */
+  @keyframes call-ripple {
+    0%   { transform: scale(1);   opacity: 0.8; }
+    100% { transform: scale(2.4); opacity: 0;   }
+  }
+  .call-ripple {
+    animation: call-ripple 1.4s ease-out infinite;
+  }
+
+  /* ── Shake — entrance for the cooldown modal ── */
+  @keyframes modal-shake {
+    0%   { transform: translateX(0); }
+    15%  { transform: translateX(-12px); }
+    30%  { transform: translateX(10px); }
+    45%  { transform: translateX(-8px); }
+    60%  { transform: translateX(6px); }
+    75%  { transform: translateX(-4px); }
+    100% { transform: translateX(0); }
+  }
+  .animate-shake {
+    animation: modal-shake 0.55s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  }
+
+  /* ── Super Prosto aurora — soft pastel northern-lights glow ── */
+  @keyframes aurora-shift {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  @keyframes aurora-glow {
+    0%, 100% {
+      box-shadow: 0 0 10px 1px rgba(160, 240, 224, 0.35),
+                  0 0 20px 3px rgba(184, 198, 255, 0.25);
+    }
+    50% {
+      box-shadow: 0 0 16px 3px rgba(255, 196, 230, 0.40),
+                  0 0 28px 6px rgba(196, 236, 255, 0.30);
+    }
+  }
+  .aurora-bg {
+    background-image: linear-gradient(110deg,
+      #a0f0e0, #b8c6ff, #ffc4e6, #c4ecff, #c8ffe0, #b8c6ff);
+    background-size: 300% 300%;
+    animation: aurora-shift 9s ease-in-out infinite;
+  }
+  .aurora-text {
+    background-image: linear-gradient(110deg,
+      #8fe9d6, #b3a8ff, #ffb3da, #a8def5);
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: aurora-shift 9s ease-in-out infinite;
+  }
+  .aurora-glow {
+    animation: aurora-glow 6s ease-in-out infinite;
+  }
+  /* Glow on the text itself (pastel northern-lights), nothing around it */
+  @keyframes aurora-text-glow {
+    0%, 100% {
+      filter: drop-shadow(0 0 5px rgba(160, 240, 224, 0.45))
+              drop-shadow(0 0 9px rgba(184, 198, 255, 0.35));
+    }
+    50% {
+      filter: drop-shadow(0 0 7px rgba(255, 196, 230, 0.50))
+              drop-shadow(0 0 12px rgba(196, 236, 255, 0.40));
+    }
+  }
+  .aurora-text-glow {
+    animation: aurora-text-glow 6s ease-in-out infinite;
+  }
+  /* Toned-down glow for tight spots like the profile panel, where the full
+     drop-shadow bleeds over neighbouring emoji/badges. Same colours, much
+     smaller blur + lower opacity. */
+  @keyframes aurora-text-glow-soft {
+    0%, 100% {
+      filter: drop-shadow(0 0 2px rgba(160, 240, 224, 0.30))
+              drop-shadow(0 0 4px rgba(184, 198, 255, 0.22));
+    }
+    50% {
+      filter: drop-shadow(0 0 3px rgba(255, 196, 230, 0.34))
+              drop-shadow(0 0 5px rgba(196, 236, 255, 0.24));
+    }
+  }
+  .aurora-text-glow-soft {
+    animation: aurora-text-glow-soft 6s ease-in-out infinite;
+  }
+  /* Page glow that fades naturally to transparent (no clipped hard edge) —
+     lives at the top only, never cut off by the layout below. */
+  .aurora-page-glow {
+    background-image:
+      radial-gradient(46% 36% at 50% -4%, rgba(184, 198, 255, 0.22), transparent 70%),
+      radial-gradient(34% 26% at 74% 4%,  rgba(255, 196, 230, 0.16), transparent 70%),
+      radial-gradient(34% 26% at 26% 4%,  rgba(160, 240, 224, 0.16), transparent 70%);
+  }
+
+  /* ── Role gradient shimmer — a slow flowing gradient for gradient-coloured
+       role names (background image is provided inline, per role). ── */
+  @keyframes role-grad-shimmer {
+    0%   { background-position: 0% 50%; }
+    100% { background-position: 200% 50%; }
+  }
+  .role-grad-shimmer {
+    animation: role-grad-shimmer 6s linear infinite;
+  }
+  /* Phones: keep the gradient but stop the continuous repaint to avoid jank. */
+  @media (max-width: 768px) {
+    .role-grad-shimmer { animation: none; }
+  }
+
+  /* ── Accessibility: honour the OS "reduce motion" setting for entrance
+       animations (popups, menus, settings sections, channel switches). The
+       elements still appear — they just skip the transform/opacity intro. ── */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-fade-in,
+    .animate-slide-up,
+    .animate-pop-in,
+    .animate-zoom-in,
+    .animate-profile-pop,
+    .animate-settings-in,
+    .animate-msg-in {
+      animation: none !important;
+    }
+  }
+
+  /* ── Custom scrollbar ── */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+  /* Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+
+  /* ── Auto-hiding scrollbar ──
+     The gutter width is constant (no layout shift); the thumb is fully
+     transparent at rest — even on hover — and only becomes visible while the
+     user is actively scrolling (`is-scrolling` toggled in JS). */
+  .scrollbar-auto-hide {
+    scrollbar-color: transparent transparent;
+  }
+  .scrollbar-auto-hide::-webkit-scrollbar-thumb {
+    background: transparent;
+  }
+  .scrollbar-auto-hide:hover::-webkit-scrollbar-thumb {
+    background: transparent;
+  }
+  .scrollbar-auto-hide.is-scrolling {
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+  .scrollbar-auto-hide.is-scrolling::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+  }
+}
+
+/* Always-opaque floating surface — for small editors / popovers (e.g. the
+   attachment filename editor) that must stay fully filled and readable even in
+   the translucent glass style. Not one of the tokens the glass rules thin, so
+   it keeps a solid background in every app style. */
+.surface-solid {
+  background-color: hsl(var(--popover));
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Liquid Glass platform style (opt-in via Settings → Appearance).
+   iOS-26 recipe (3 ingredients): heavy backdrop blur + saturation boost + a
+   neutral translucent tint with a refraction edge (light top, dark bottom).
+   No colour gradients — pure frosted glass over the app content behind it.
+   Placed OUTSIDE @layer so it overrides Tailwind utilities.
+   ───────────────────────────────────────────────────────────────────────── */
+[data-app-style='glass'] {
+  --glass-filter: saturate(120%) blur(14px);
+  --glass-edge: inset 0 1px 0 0 hsl(0 0% 100% / 0.08);
+  --glass-lift: 0 2px 10px -6px hsl(0 0% 0% / 0.35);
+  --glass-hair: 1px solid hsl(0 0% 100% / 0.08);
+}
+
+/* Big, soft corners */
+[data-app-style='glass'] .rounded,
+[data-app-style='glass'] .rounded-md   { border-radius: 0.7rem; }
+[data-app-style='glass'] .rounded-lg   { border-radius: 0.95rem; }
+[data-app-style='glass'] .rounded-xl   { border-radius: 1.25rem; }
+[data-app-style='glass'] .rounded-2xl  { border-radius: 1.6rem; }
+[data-app-style='glass'] .rounded-3xl  { border-radius: 2rem; }
+
+/* ── Backdrop blur is applied ONLY to large, top-level surfaces. ──
+   backdrop-filter is one of the most expensive GPU effects; applying it to
+   every small/nested element (buttons, hover rows, chips) tanks performance.
+   Small surfaces below get a translucent tint instead — they still read as
+   glass because they sit over a blurred parent. */
+[data-app-style='glass'] .bg-card,
+[data-app-style='glass'] .bg-popover,
+[data-app-style='glass'] aside,
+[data-app-style='glass'] nav.fixed,
+[data-app-style='glass'] input.bg-background,
+[data-app-style='glass'] textarea.bg-background {
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+}
+
+/* Panels / cards / posts / popovers: neutral dark glass, hairline border,
+   one very subtle lift — no heavy drop shadows or refraction glow. */
+[data-app-style='glass'] .bg-card,
+[data-app-style='glass'] .bg-popover {
+  background-color: hsl(var(--card) / 0.5);
+  border: var(--glass-hair);
+  box-shadow: var(--glass-lift);
+}
+
+/* Secondary surfaces & filled secondary buttons → lighter glass tint + sheen */
+[data-app-style='glass'] .bg-secondary,
+[data-app-style='glass'] .bg-muted {
+  background-color: hsl(var(--secondary) / 0.55);
+  border: var(--glass-hair);
+  box-shadow: inset 0 1px 0 0 hsl(0 0% 100% / 0.12);
+}
+
+/* Primary (accent) buttons keep their colour + a glossy top sheen (no glow) */
+[data-app-style='glass'] .bg-link,
+[data-app-style='glass'] .bg-primary,
+[data-app-style='glass'] .bg-destructive {
+  box-shadow: inset 0 1px 0 0 hsl(0 0% 100% / 0.28);
+}
+
+/* Inactive / ghost & outline buttons (they carry `bg-transparent`) get a faint
+   frosted base so even un-pressed controls read as glass — subtle, not boxed. */
+[data-app-style='glass'] button.bg-transparent,
+[data-app-style='glass'] a.bg-transparent {
+  background-color: hsl(var(--secondary) / 0.28);
+  border: var(--glass-hair);
+  box-shadow: inset 0 1px 0 0 hsl(0 0% 100% / 0.08);
+}
+
+/* Text inputs & textareas → frosted glass fields */
+[data-app-style='glass'] input.bg-background,
+[data-app-style='glass'] textarea.bg-background {
+  background-color: hsl(var(--secondary) / 0.4);
+  border-color: hsl(0 0% 100% / 0.1);
+}
+
+/* Structural chrome: rail / sidebars / right panel */
+[data-app-style='glass'] aside {
+  background-color: hsl(var(--background) / 0.45);
+  border-color: hsl(0 0% 100% / 0.07);
+  box-shadow: inset 0 1px 0 0 hsl(0 0% 100% / 0.06);
+}
+
+/* Fixed bars (mobile nav) */
+[data-app-style='glass'] nav.fixed {
+  background-color: hsl(var(--background) / 0.55);
+  box-shadow: inset 0 1px 0 0 hsl(0 0% 100% / 0.1);
+}
+
+/* Account-bar column edge: match the frosted sidebar's border colour so the
+   vertical separator reads as one continuous line (not grey below / white above). */
+[data-app-style='glass'] .col-edge {
+  border-color: hsl(0 0% 100% / 0.07);
+}
+
+/* Interactive accent surfaces (buttons, active rows, hover states, server
+   tiles) → translucent tint + hairline + faint sheen so controls read as glass */
+[data-app-style='glass'] .bg-accent {
+  background-color: hsl(var(--accent) / 0.6);
+  border: var(--glass-hair);
+  box-shadow: inset 0 1px 0 0 hsl(0 0% 100% / 0.12);
+}
+
+/* Server-settings tab nav → separated glass pills (tint only, no blur) */
+[data-app-style='glass'] .settings-nav > button {
+  background-color: hsl(var(--secondary) / 0.4);
+  border: 1px solid hsl(0 0% 100% / 0.08);
+  box-shadow: inset 0 1px 0 0 hsl(0 0% 100% / 0.1);
+}
+[data-app-style='glass'] .settings-nav > button:hover {
+  background-color: hsl(var(--secondary) / 0.6);
+}
+
+/* Rail server tiles + rail buttons → glass frame ring + soft top sheen so the
+   icon buttons (create / discover) read as glass and don't blend into the rail.
+   The sheen is kept soft to avoid shimmering over moving content behind it. */
+[data-app-style='glass'] .glass-tile {
+  box-shadow: 0 0 0 1px hsl(0 0% 100% / 0.16), inset 0 1px 1px 0 hsl(0 0% 100% / 0.12);
+}
+
+/* Translucent (alpha) button/surface backgrounds — e.g. `bg-muted/50`,
+   `bg-secondary/50`, `bg-card/60`. The exact-token `[class~=]` selector matches
+   these always-on utilities without catching hover-only variants like
+   `hover:bg-accent`, so every pill/icon button reads as glass consistently. */
+[data-app-style='glass'] [class~='bg-muted/50'],
+[data-app-style='glass'] [class~='bg-muted/40'],
+[data-app-style='glass'] [class~='bg-muted/30'],
+[data-app-style='glass'] [class~='bg-muted/60'],
+[data-app-style='glass'] [class~='bg-secondary/50'],
+[data-app-style='glass'] [class~='bg-secondary/40'],
+[data-app-style='glass'] [class~='bg-secondary/30'],
+[data-app-style='glass'] [class~='bg-secondary/60'],
+[data-app-style='glass'] [class~='bg-secondary/80'],
+[data-app-style='glass'] [class~='bg-card/60'],
+[data-app-style='glass'] [class~='bg-card/40'],
+[data-app-style='glass'] [class~='bg-accent/60'],
+[data-app-style='glass'] [class~='bg-accent/50'],
+[data-app-style='glass'] [class~='bg-accent/40'],
+[data-app-style='glass'] [class~='bg-accent/30'] {
+  border: var(--glass-hair);
+  box-shadow: inset 0 1px 0 0 hsl(0 0% 100% / 0.12);
+}
+
+/* Mobile: backdrop-filter is far more expensive on phones (esp. iOS Safari).
+   Use a much lighter blur and drop it from inputs to keep scrolling smooth. */
+@media (max-width: 768px) {
+  [data-app-style='glass'] {
+    --glass-filter: saturate(130%) blur(8px);
+  }
+  [data-app-style='glass'] input.bg-background,
+  [data-app-style='glass'] textarea.bg-background {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Desktop (Electron) chrome: the custom title bar is a fixed 32px strip at
+   z-100. Full-screen modal overlays that use z-modal (60) render *under* it,
+   so the title bar's bottom edge would slice through a modal's close button
+   near the top. Push these overlays below the title bar so their content —
+   and the window controls — stay fully visible & usable.
+   Placed OUTSIDE @layer so it beats the `inset-0` utility (top: 0).
+   ───────────────────────────────────────────────────────────────────────── */
+html.desktop-chrome .fixed.inset-0.z-modal,
+html.desktop-chrome .app-overlay {
+  top: 32px;
+}
+
+/* Floating chat widget window (desktop popout): transparent OS window so the
+   rounded, semi-opaque panel floats over other apps. */
+html.widget-mode,
+html.widget-mode body {
+  background: transparent !important;
+}
+html.widget-mode .widget-root {
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 12px 40px -8px rgba(0, 0, 0, 0.55);
+}
+/* Inside a widget window it's just the chat — no back navigation, and no
+   call / create-group actions in the header. */
+html.widget-mode .chat-back,
+html.widget-mode .widget-hide {
+  display: none !important;
+}
+/* Smooth, proportional resize + reliable wheel scrolling inside the widget. */
+html.widget-mode,
+html.widget-mode body {
+  overflow: hidden;
+}
+html.widget-mode .widget-root * {
+  overscroll-behavior: contain;
+}
+
+/* ── Rich message input (EmojiInput) — Discord-style inline emoji chips ── */
+.ei-root {
+  outline: none;
+  min-height: 1.5em;
+  position: relative; /* anchor the absolutely-positioned placeholder below */
+}
+.ei-root[data-empty='true']::before {
+  content: attr(data-placeholder);
+  /* Absolutely positioned so the placeholder stays out of the text flow. An
+     inline ::before makes the browser mis-place the caret for the very first
+     character/emoji typed into an empty field (it jumps to the end); once the
+     field has content the placeholder is gone, which is why re-inserting works.
+     `inset: 0` + `padding: inherit` keeps it aligned with where real text starts. */
+  position: absolute;
+  inset: 0;
+  padding: inherit;
+  color: inherit;
+  opacity: 0.4;
+  pointer-events: none;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ei-chip {
+  display: inline-block;
+  /* Kept a touch below the line-height (even the tight `text-sm` fields use
+     ~1.43) and centered, so the emoji never makes the line box taller than a
+     line of plain text — that's what caused the caret to grow and jump down to
+     the emoji. `vertical-align: middle` (not the old `-0.3em`) keeps it on the
+     text line, not below it. A chip is a single <img> node, so Backspace still
+     deletes it atomically (no `user-select: all` needed). */
+  height: 1.25em;
+  width: auto;
+  vertical-align: middle;
+  object-fit: contain;
+  margin: 0 1px;
+}
+
+/* Horizontal tab strips (e.g. the feed filter tabs) that scroll on narrow
+   screens without showing a scrollbar. */
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Bottom clearance for the floating mobile tab bar (see --bottom-nav-space).
+   Applied to scroll containers / page roots on mobile; zeroed at md+ where the
+   tab bar is replaced by the left rail. */
+.pb-bottom-nav {
+  padding-bottom: var(--bottom-nav-space);
+}
+@media (min-width: 768px) {
+  .pb-bottom-nav {
+    padding-bottom: 0;
+  }
+}
+
+/* ═════════════════════════════════════════════════════════════════════════
+   Marketing surfaces (public landing + auth brand panel).
+   Self-contained dark aesthetic: film grain, brand glow, scroll-reveal.
+   Scoped so none of it touches the logged-in app shell.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* Lenis smooth-scroll (landing only). Lenis adds these classes to <html> while
+   active; the rules keep native scroll-behavior out of its way and let nested
+   scroll areas opt out with [data-lenis-prevent]. */
+html.lenis,
+html.lenis body { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+.lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
+.lenis.lenis-stopped { overflow: hidden; }
+
+/* Fine film grain — a self-contained SVG turbulence, no external asset.
+   Drop <div class="noise-layer" /> as an absolutely-positioned overlay and
+   dial its strength with an opacity utility (e.g. `opacity-[0.06]`). */
+.noise-layer {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+}
+
+/* Scroll-reveal: elements start hidden, animate in when they enter the
+   viewport (a subtle zoom + rise). Honours reduced-motion. */
+@keyframes reveal-in {
+  from { opacity: 0; transform: translateY(26px) scale(0.975); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.reveal { opacity: 0; will-change: opacity, transform; }
+.reveal.reveal-in {
+  animation: reveal-in 0.72s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .reveal.reveal-in { opacity: 1; transform: none; animation: none; }
+}

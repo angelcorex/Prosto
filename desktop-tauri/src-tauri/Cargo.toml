@@ -1,0 +1,35 @@
+[package]
+name = "prosto-desktop"
+version = "2.0.1"
+description = "Prosto desktop client (Tauri)"
+authors = ["Prosto"]
+edition = "2021"
+rust-version = "1.77"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-notification = "2"
+tauri-plugin-window-state = "2"
+tauri-plugin-updater = "2"
+# single-instance gets the deep-link feature so the prosto:// OAuth return is
+# routed into the already-running window instead of spawning a second process.
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+tauri-plugin-deep-link = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-autostart = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[features]
+# Enabled by tauri when building for production.
+custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+panic = "abort"     # smaller binary — no unwind tables
+codegen-units = 1   # better optimization
+lto = true          # link-time optimization
+opt-level = "s"     # optimize for size (thin remote-URL client)
+strip = true        # strip symbols

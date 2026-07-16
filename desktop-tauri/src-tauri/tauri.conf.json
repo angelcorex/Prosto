@@ -1,0 +1,51 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Prosto",
+  "version": "2.0.1",
+  "identifier": "com.prosto.desktop",
+  "build": {
+    "frontendDist": "../app"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "dmg", "appimage"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "SocialNetworking",
+    "shortDescription": "Prosto",
+    "longDescription": "Prosto desktop client for the Prosto social platform.",
+    "windows": {
+      "allowDowngrades": true,
+      "nsis": {
+        "installMode": "currentUser",
+        "displayLanguageSelector": true,
+        "languages": ["English", "Russian"]
+      }
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/angelcorex/prostodesktop/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENCQTdGNDNFREE0MjVDNkUKUldSdVhFTGFQdlNueTNybXgxZWlXMXpLYmpxMHIyajVhNnlCL3NQaGdBQ0lpMXVOMjRyYnZPalYK"
+    },
+    "deep-link": {
+      "desktop": {
+        "schemes": ["prosto"]
+      }
+    }
+  }
+}

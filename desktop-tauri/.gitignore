@@ -1,0 +1,12 @@
+# dependencies
+node_modules/
+
+# rust / tauri build artifacts
+src-tauri/target/
+
+# tauri-generated ACL schemas (regenerated on every build)
+src-tauri/gen/schemas/
+
+# signing keys (never commit)
+*.key
+*.key.pub

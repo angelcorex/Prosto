@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-badge-set"
+description = "Enables the badge_set command without any pre-configured scope."
+commands.allow = ["badge_set"]
+
+[[permission]]
+identifier = "deny-badge-set"
+description = "Denies the badge_set command without any pre-configured scope."
+commands.deny = ["badge_set"]

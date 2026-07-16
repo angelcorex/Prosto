@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-popout"
+description = "Enables the popout command without any pre-configured scope."
+commands.allow = ["popout"]
+
+[[permission]]
+identifier = "deny-popout"
+description = "Denies the popout command without any pre-configured scope."
+commands.deny = ["popout"]

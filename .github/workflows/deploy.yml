@@ -1,0 +1,48 @@
+name: Deploy
+
+# Auto-deploy to the VPS on every push to main (and via the manual "Run
+# workflow" button). GitHub SSHes into the server and runs the deploy: pull the
+# latest code, install deps, build, and restart the pm2 process.
+#
+# Requires these repository secrets (Settings > Secrets and variables > Actions):
+#   VPS_HOST     - server IP (e.g. 144.31.151.91)
+#   VPS_USER     - ssh user (e.g. root)
+#   VPS_PORT     - ssh port (e.g. 22)
+#   VPS_SSH_KEY  - the PRIVATE deploy key (full text, incl. BEGIN/END lines)
+#
+# Note: this does NOT run database migrations — apply Supabase migrations
+# manually in the SQL editor when a push includes new ones.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+# Never run two deploys at once; let a running deploy finish before the next.
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build & restart on VPS
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          command_timeout: 30m
+          script_stop: true
+          script: |
+            export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+            cd ~/prosto
+            git fetch origin main
+            git reset --hard origin/main
+            npm ci
+            npm run build
+            pm2 restart prosto --update-env || pm2 start "npm run start" --name prosto
+            pm2 save
