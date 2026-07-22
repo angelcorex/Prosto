@@ -111,34 +111,42 @@ export function AppShell({ iconRail, dmSidebar, rightPanel, serverSidebar, serve
     else setDrawer(false);
   }
 
+  // ── Modular panel styling (md+ only) ──
+  // Each major zone becomes a self-contained "card": its own background, large
+  // rounded corners, a full-strength `#2f2f32` outline and a soft lift, floating
+  // over the recessed `workspace` canvas with generous gaps. On mobile (base
+  // classes) the panels stay full-bleed and joined — the mobile redesign is
+  // deliberately left untouched.
+  // Card frame WITHOUT a background — each panel sets its own fill so the server
+  // rail can keep its distinct `bg-rail` tone while every other panel shares the
+  // dark `bg-background` fill.
+  const cardCls =
+    'md:overflow-hidden md:rounded-3xl md:border md:border-border md:shadow-lg';
+
   // Reusable nav group pieces (rail + contextual sidebar).
+  // The server rail is the ONLY panel with a distinct surface (`bg-rail`).
   const railAside = (
-    <aside className="flex h-full w-[64px] shrink-0 flex-col border-r border-border/20 bg-background md:w-[72px]">
+    <aside className={cn('flex h-full w-[64px] shrink-0 flex-col border-r border-border/20 bg-background md:w-[76px] md:border-r-0 md:bg-rail', cardCls)}>
       {iconRail}
     </aside>
   );
+  // Sidebar card. The account panel now lives at the BOTTOM of this card (it can
+  // no longer span the rail column, since the rail is its own separate card).
   const sidebarAside = (variant: 'list' | 'drawer') => (
     <aside
       className={cn(
-        'flex h-full min-w-0 shrink-0 flex-col border-r border-border/20 md:w-[280px] md:flex-none',
-        variant === 'list' ? 'flex-1 bg-card/40' : 'w-[80vw] max-w-[340px] bg-background',
+        'flex h-full min-w-0 shrink-0 flex-col border-r border-border/20 bg-background md:w-[280px] md:flex-none md:border-r-0',
+        variant === 'list' ? 'flex-1' : 'w-[80vw] max-w-[340px]',
+        cardCls,
       )}
     >
-      {sidebar}
-    </aside>
-  );
-
-  // Rail + sidebar on top, the account panel spanning both columns at the
-  // bottom (Discord-style account bar, but stretched under the server rail too).
-  const navGroup = (variant: 'list' | 'drawer') => (
-    <div className="flex h-full w-full min-h-0 flex-col">
-      <div className="flex min-h-0 flex-1">
-        {railAside}
-        {sidebarAside(variant)}
-      </div>
+      <div className="min-h-0 flex-1 overflow-hidden">{sidebar}</div>
       {userPanel && (
         <div className={cn(
-          'col-edge shrink-0 border-r border-border/20 bg-background',
+          // Mobile keeps the hairline separator; desktop drops it so the account
+          // bar reads as a spaced sub-panel (the gap separates it from the list)
+          // and doesn't collide with the card's rounded bottom corners.
+          'col-edge shrink-0 border-t border-border/20 bg-background md:border-t-0 md:bg-transparent',
           variant === 'list' && padForBar
             ? BAR_PAD
             : 'pb-[env(safe-area-inset-bottom)] md:pb-0',
@@ -146,6 +154,15 @@ export function AppShell({ iconRail, dmSidebar, rightPanel, serverSidebar, serve
           {userPanel}
         </div>
       )}
+    </aside>
+  );
+
+  // Rail + sidebar as two independent cards, separated by a gap on desktop and
+  // sitting flush (joined) on mobile.
+  const navGroup = (variant: 'list' | 'drawer') => (
+    <div className="flex h-full w-full min-h-0 md:gap-2.5">
+      {railAside}
+      {sidebarAside(variant)}
     </div>
   );
 
@@ -160,35 +177,41 @@ export function AppShell({ iconRail, dmSidebar, rightPanel, serverSidebar, serve
   }
 
   return (
-    <div className="pwa-safe relative flex h-dvh w-full flex-col overflow-hidden">
-      {/* Browser-style tabs (desktop) */}
+    <div className="pwa-safe relative flex h-dvh w-full flex-col overflow-hidden md:gap-2.5 md:bg-workspace md:p-2.5">
+      {/* Browser-style tabs (desktop) — its own rounded card in the workspace */}
       <TabBar />
 
       <div
-        className="relative flex min-h-0 w-full flex-1 overflow-hidden"
+        className="relative flex min-h-0 w-full flex-1 overflow-hidden md:gap-2.5"
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
       {/* Inline navigation group: desktop always, plus the mobile list screen */}
       {!useDrawerMode && (
-        <div className={cn('flex shrink-0', showList ? 'relative w-full md:w-auto' : 'hidden md:flex')}>
+        <div className={cn('flex shrink-0 md:gap-2.5', showList ? 'relative w-full md:w-auto' : 'hidden md:flex')}>
           {navGroup(showList ? 'list' : 'drawer')}
         </div>
       )}
 
-      {/* Main content */}
+      {/* Main content — its own card, floating over the workspace canvas.
+          The card itself is a NON-scrolling clip frame (overflow-hidden) so its
+          rounded corners stay clean; the inner div is the actual scroll
+          container. Scrolling on `main` directly would let the scrollbar square
+          off the right-hand rounded corners. */}
       <main
         className={cn(
-          'min-w-0 flex-1 flex-col overflow-y-auto',
+          'min-w-0 flex-1 flex-col overflow-hidden',
+          'md:rounded-3xl md:border md:border-border md:bg-background md:shadow-lg',
           showList ? 'hidden md:flex' : 'flex',
-          !showList && padForBar && BAR_PAD,
         )}
       >
-        {children}
+        <div className={cn('flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto', !showList && padForBar && BAR_PAD)}>
+          {children}
+        </div>
       </main>
 
-      {/* Right panel (desktop) */}
-      <aside className="hidden h-full w-[300px] shrink-0 flex-col border-l border-border/20 xl:flex">
+      {/* Right panel (desktop) — its own card */}
+      <aside className="hidden h-full w-[300px] shrink-0 flex-col overflow-hidden rounded-3xl border border-border bg-background shadow-lg xl:flex">
         {right}
       </aside>
 

@@ -9,7 +9,7 @@ import { Hash, ImagePlus, Paperclip, Smile, Phone, Reply, MoreHorizontal, Copy, 
 
 import { cn }             from '@/lib/utils/cn';
 import { attachmentsOf, isStorageUrl, withAttachmentMeta, MAX_CHAT_IMAGES, uploadLimitBytes, uploadLimitMb, type ChatAttachment } from '@/lib/utils/media';
-import { VerifiedBadge, MiniProfilePopup, EmojiPicker, EmojiInput, type EmojiInputHandle, GifPicker, UserContextMenu, ModeratorBadge, PremiumBadge, BotBadge, ChatGif, ChatAlbum, ChatMedia, AttachMenu, renderEmojiNodes, MessageText, LinkPreview, FormattingHelp, useSlashCommands }  from '@/components/ui';
+import { VerifiedBadge, MiniProfilePopup, EmojiPicker, EmojiInput, type EmojiInputHandle, GifPicker, UserContextMenu, ModeratorBadge, PremiumBadge, BotBadge, ChatGif, ChatAlbum, ChatMedia, AttachMenu, renderEmojiNodes, MessageText, LinkPreview, FormattingHelp, useSlashCommands, ChatDaySeparator, isSameCalendarDay, useViewerTimeZone }  from '@/components/ui';
 import { ReactionBar, type ReactionGroup } from '@/components/ui/reaction-bar';
 import { createClient }   from '@/lib/supabase/client';
 import { resolveEmojiShortcodes } from '@/lib/emoji';
@@ -63,6 +63,7 @@ interface Profile {
 
 interface OtherUser {
   id?: string;
+  public_id?: string | null;
   username: string;
   display_name: string | null;
   avatar_url: string | null;
@@ -229,6 +230,7 @@ export function ChatWindow({
   const { acquire: acquireSend, blockedFor, clearBlock } = useRateLimit('message');
 
   const tm = useT('messages');
+  const viewerTimeZone = useViewerTimeZone();
   const tc = useT('calls');
   const ts = useT('status');
 
@@ -1172,51 +1174,33 @@ export function ChatWindow({
     return out.slice(0, 8);
   }, [mention, group, members, otherUser, myProfileId, tm]);
 
-  /* ── Audio call ── */
-  const logCallMessage = async (kind: 'started' | 'ended', seconds: number | null) => {
-    // Written via a SECURITY DEFINER RPC (not a direct insert) so direct_messages
-    // stays locked down at the RLS layer — all writes go through guarded RPCs.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: rows } = await (sbRef.current as any)
-      .rpc('log_call_message', { conv_id: conversationId, kind, seconds });
-    const data = Array.isArray(rows) ? rows[0] : rows;
-    if (data) {
-      setMessages(prev => [...prev, {
-        id:           data.id,
-        content:      kind,
-        created_at:   data.created_at,
-        sender_id:    myProfileId,
-        type:         'call',
-        call_seconds: seconds,
-        sender: {
-          username:     myProfile?.username ?? '',
-          display_name: myProfile?.display_name ?? null,
-          avatar_url:   myProfile?.avatar_url ?? null,
-          is_verified:  myProfile?.is_verified,
-          is_moderator: myProfile?.is_moderator,
-        },
-      }]);
-    }
+  /* ── Audio call (owned globally by CallProvider) ── */
+  const call = useCall();
+
+  // Peer descriptor for starting a 1:1 call from this DM. Group calls aren't
+  // supported by the global-call backend, so this stays null for groups.
+  const callPeer = otherUser?.id
+    ? {
+        id: otherUser.id,
+        public_id: otherUser.public_id ?? null,
+        username: otherUser.username,
+        display_name: otherUser.display_name,
+        avatar_url: otherUser.avatar_url,
+        is_verified: otherUser.is_verified,
+        is_moderator: otherUser.is_moderator,
+        is_premium: otherUser.is_premium,
+      }
+    : null;
+
+  const startCallHere = () => {
+    if (!callPeer) return;
+    void call.startCall({ conversationId, peer: callPeer });
   };
 
-  const call = useCall({
-    supabase: sbRef.current,
-    conversationId,
-    myId: myProfileId,
-    onCallStarted: () => { logCallMessage('started', null); },
-    onCallEnded: ({ seconds, connected, byMe }) => {
-      if (!byMe) return;
-      logCallMessage('ended', connected ? seconds : -1);
-    },
-  });
-
-  const meUser = {
-    username:     myProfile?.username ?? '',
-    display_name: myProfile?.display_name ?? null,
-    avatar_url:   myProfile?.avatar_url ?? null,
-    is_verified:  myProfile?.is_verified,
-    is_moderator: myProfile?.is_moderator,
-  };
+  // Show the rich in-chat call view only for THIS conversation's active call.
+  // Incoming calls surface through the global centre overlay instead.
+  const callActiveHere =
+    call.conversationId === conversationId && (call.state === 'calling' || call.state === 'connected');
 
   return (
     <div
@@ -1235,9 +1219,6 @@ export function ChatWindow({
           </div>
         </div>
       )}
-
-      {/* Hidden audio sink for the remote stream */}
-      <audio ref={call.remoteAudioRef} autoPlay className="hidden" />
 
       {groupModalOpen && (
         <CreateGroupModal
@@ -1302,7 +1283,7 @@ export function ChatWindow({
               conversationId={conversationId}
               pinned={convPinned}
               muted={convMuted}
-              onCall={call.startCall}
+              onCall={startCallHere}
               onCloseDm={handleCloseDm}
               onTogglePin={handleTogglePin}
               onToggleMute={handleToggleMute}
@@ -1335,7 +1316,7 @@ export function ChatWindow({
             {/* Call button */}
             <button
               type="button"
-              onClick={call.startCall}
+              onClick={startCallHere}
               disabled={call.state !== 'idle'}
               title={tc('audioCall')}
               className="widget-hide ml-auto flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
@@ -1362,12 +1343,12 @@ export function ChatWindow({
         )}
       </div>
 
-      {/* ── Call panel — unified for incoming / calling / connected ── */}
-      {call.state !== 'idle' && (
+      {/* ── Call panel — unified for calling / connected in THIS conversation ── */}
+      {callActiveHere && (
         <CallUI
           state={call.state}
           otherUser={otherUser}
-          me={meUser}
+          me={call.me}
           muted={call.muted}
           deafened={call.deafened}
           remoteMuted={call.remoteMuted}
@@ -1457,9 +1438,17 @@ export function ChatWindow({
 
             // Day separator when the calendar day changes
             const prevForDay = messages[i - 1];
-            const showDay = !prevForDay || !sameDay(prevForDay.created_at, msg.created_at);
+            const showDay = !prevForDay || !isSameCalendarDay(prevForDay.created_at, msg.created_at, viewerTimeZone);
             const daySep = showDay
-              ? <DaySeparator key={`day-${msg.id}`} date={msg.created_at} locale={locale} t={tm} />
+              ? (
+                  <ChatDaySeparator
+                    date={msg.created_at}
+                    locale={locale}
+                    timeZone={viewerTimeZone}
+                    todayLabel={tm('today')}
+                    yesterdayLabel={tm('yesterday')}
+                  />
+                )
               : null;
 
             // ── System call message ──
@@ -1535,7 +1524,8 @@ export function ChatWindow({
             // A system message (pin / group event) breaks the block — the next
             // real message must start fresh with its avatar + name, not tuck
             // under the system line as if grouped.
-            const isGrouped = prevMsg?.sender_id === msg.sender_id
+            const isGrouped = !showDay
+              && prevMsg?.sender_id === msg.sender_id
               && prevMsg?.type !== 'call' && prevMsg?.type !== 'system'
               && !msg.reply_to
               && new Date(msg.created_at).getTime() - new Date(prevMsg.created_at).getTime() < 5 * 60 * 1000;
@@ -1633,7 +1623,7 @@ export function ChatWindow({
                         conversationId={conversationId}
                         pinned={convPinned}
                         muted={convMuted}
-                        onCall={call.startCall}
+                        onCall={startCallHere}
                         onCloseDm={handleCloseDm}
                         onTogglePin={handleTogglePin}
                         onToggleMute={handleToggleMute}
@@ -1982,36 +1972,6 @@ export function ChatWindow({
   );
 }
 
-/* ── Day separator helpers ── */
-function sameDay(a: string, b: string): boolean {
-  const da = new Date(a), db = new Date(b);
-  return da.getFullYear() === db.getFullYear() && da.getMonth() === db.getMonth() && da.getDate() === db.getDate();
-}
-
-function DaySeparator({
-  date, locale, t,
-}: {
-  date: string; locale: string; t: (k: string) => string;
-}) {
-  const d     = new Date(date);
-  const now   = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const that  = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const diffDays = Math.round((today.getTime() - that.getTime()) / 86400000);
-
-  let label: string;
-  if (diffDays === 0)      label = t('today');
-  else if (diffDays === 1) label = t('yesterday');
-  else label = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric' }).format(d);
-
-  return (
-    <div className="my-4 flex items-center gap-3 px-2">
-      <div className="h-px flex-1 bg-border/40" />
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/50">{label}</span>
-      <div className="h-px flex-1 bg-border/40" />
-    </div>
-  );
-}
 
 /* ── Call system message text ── */
 function callMessageInfo(

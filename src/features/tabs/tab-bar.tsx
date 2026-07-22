@@ -56,7 +56,7 @@ export function TabBar() {
   }
 
   return (
-    <div className="hidden h-10 shrink-0 items-center gap-1 border-b border-border/20 bg-background/80 px-2 md:flex">
+    <div className="hidden h-11 shrink-0 items-center gap-1 rounded-3xl border border-border bg-background px-2 shadow-lg md:flex">
       <div className="scrollbar-auto-hide flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
         {tabs.map((tab) => {
           const active = tab.key === currentKey;

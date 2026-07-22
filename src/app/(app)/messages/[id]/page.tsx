@@ -167,6 +167,7 @@ export default async function ConversationPage({ params }: Props) {
 
   const otherUser = {
     id:            other.id,
+    public_id:     id,
     username:      other.username,
     display_name:  other.display_name,
     avatar_url:    other.avatar_url,

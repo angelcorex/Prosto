@@ -18,6 +18,8 @@ export type ColorScheme = 'light' | 'dark';
 export type ColorToken =
   | 'background'
   | 'foreground'
+  | 'workspace'
+  | 'rail'
   | 'card'
   | 'card-foreground'
   | 'popover'
@@ -52,6 +54,12 @@ type Palette = Record<ColorToken, string>;
 const light: Palette = {
   background: '0 0% 99%',
   foreground: '240 12% 10%',
+  // Recessed canvas behind the modular panel cards — a touch greyer than the
+  // near-white card surface so each card visibly floats above it.
+  workspace: '240 6% 94%',
+  // Server-rail card surface (dark theme has a distinct darker tone; in light
+  // it matches the other cards).
+  rail: '0 0% 99%',
   card: '0 0% 99%',
   'card-foreground': '240 12% 10%',
   popover: '0 0% 99%',
@@ -77,11 +85,15 @@ const light: Palette = {
 };
 
 const dark: Palette = {
-  background: '240 4% 6%',          /* ~#0e0e10 — very dark, almost black */
+  background: '240 13% 5%',          /* #0a0a0d — deep content fill inside panels */
   foreground: '220 14% 93%',
-  card: '240 4% 9%',                 /* ~#161618 */
+  // Recessed canvas behind the modular panel cards — shown in the gaps between
+  // the floating panels (a hair lighter than the deepest content fill).
+  workspace: '240 15% 5%',           /* #0b0b0f */
+  rail: '240 6% 9%',                 /* #161619 — server-rail card surface */
+  card: '240 6% 10%',                /* #18181b — chat + all other panel cards */
   'card-foreground': '220 14% 93%',
-  popover: '240 4% 9%',
+  popover: '240 6% 10%',             /* #18181b — match the card surface */
   'popover-foreground': '220 14% 93%',
   primary: '220 14% 95%',
   'primary-foreground': '240 4% 9%',
@@ -98,8 +110,8 @@ const dark: Palette = {
   warning: '40 85% 65%',
   'warning-foreground': '240 4% 6%',
   link: '235 86% 77%',
-  border: '240 3% 17%',
-  input: '240 3% 18%',
+  border: '240 3% 19%',             /* #2f2f32 — panel outlines + hairlines */
+  input: '240 3% 19%',
   ring: '240 3% 36%',
 };
 

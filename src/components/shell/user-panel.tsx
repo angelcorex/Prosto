@@ -105,7 +105,7 @@ export function UserPanel({ username, userId, avatarUrl, bannerUrl, displayName,
   };
 
   return (
-    <div ref={ref} className="relative mx-auto w-full max-w-md px-2 pb-2 md:mx-0 md:max-w-none">
+    <div ref={ref} className="relative mx-auto w-full max-w-md p-2 md:mx-0 md:max-w-none md:p-3">
 
       {/* ── Trigger — larger touch target on phones ── */}
       <div className={cn(

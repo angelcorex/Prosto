@@ -18,6 +18,7 @@ import { ServerSidebar, ServerMembersPanel } from '@/features/servers';
 import { AppLoader } from '@/components/shell/app-loader';
 import { AgeProvider, BirthDateModal } from '@/features/age';
 import { MobileComposer } from '@/features/posts';
+import { CallProvider, GlobalIncomingCall, VoiceConnectionPanel } from '@/features/calls';
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const user = await getCurrentUser();
@@ -45,21 +46,24 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const birthDate: string | null   = profile?.birth_date   ?? null;
 
   const userPanel = (
-    <UserPanel
-      username={username}
-      userId={user.id}
-      avatarUrl={avatarUrl}
-      bannerUrl={bannerUrl}
-      displayName={displayName}
-      pronouns={pronouns}
-      bio={bio}
-      isVerified={isVerified}
-      isModerator={isModerator}
-      isPremium={isPremium}
-      status={status}
-      lastSeen={lastSeen}
-      customStatus={customStatus}
-    />
+    <>
+      <VoiceConnectionPanel />
+      <UserPanel
+        username={username}
+        userId={user.id}
+        avatarUrl={avatarUrl}
+        bannerUrl={bannerUrl}
+        displayName={displayName}
+        pronouns={pronouns}
+        bio={bio}
+        isVerified={isVerified}
+        isModerator={isModerator}
+        isPremium={isPremium}
+        status={status}
+        lastSeen={lastSeen}
+        customStatus={customStatus}
+      />
+    </>
   );
 
   return (
@@ -87,6 +91,17 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       <AgeProvider birthDate={birthDate}>
       <BirthDateModal />
       <AppLoader>
+      <CallProvider
+        me={{
+          id: user.id,
+          username: username ?? '',
+          display_name: displayName,
+          avatar_url: avatarUrl,
+          is_verified: isVerified,
+          is_moderator: isModerator,
+          is_premium: isPremium,
+        }}
+      >
       <AppShell
         iconRail={<IconRail myUsername={username} />}
         userPanel={userPanel}
@@ -118,6 +133,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       >
         {children}
       </AppShell>
+      <GlobalIncomingCall />
+      </CallProvider>
       </AppLoader>
       </AgeProvider>
     </>

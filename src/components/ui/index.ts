@@ -14,6 +14,7 @@ export * from './video-player';
 export * from './button';
 export * from './card';
 export * from './chat-gif';
+export * from './chat-day-separator';
 export * from './color-picker';
 export * from './grid-background';
 export * from './image-cropper';

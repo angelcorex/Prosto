@@ -33,7 +33,8 @@
       "and": "and",
       "privacyLink": "Privacy Policy",
       "guidelinesLink": "Community Guidelines",
-      "chooseAvatar": "Choose an avatar"
+      "chooseAvatar": "Choose an avatar",
+      "videoCaption": "Just so you don't fall asleep while creating your account"
     },
     "oauth": {
       "or": "or",
@@ -78,6 +79,10 @@
       "mustAgree": "Please accept the Terms, Privacy Policy and Guidelines to continue",
       "recoverySessionExpired": "This reset link has expired. Request a new one.",
       "maxAccounts": "You can keep up to {max} accounts on this device."
+    },
+    "captcha": {
+      "unavailable": "Couldn't load the verification challenge. You can continue anyway.",
+      "retry": "Try again"
     },
     "messages": {
       "confirmEmail": "We sent a confirmation link. Check your email to sign in.",
@@ -694,6 +699,7 @@
     "calling": "Calling {name}…",
     "peerLeft": "The other person left",
     "connecting": "Connecting…",
+    "voiceConnected": "Voice connected",
     "qualityGood": "Excellent connection",
     "qualityMedium": "Average connection",
     "qualityPoor": "Poor connection",

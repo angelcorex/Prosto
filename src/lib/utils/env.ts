@@ -29,6 +29,24 @@ export const env = {
       return required('SUPABASE_SERVICE_ROLE_KEY', process.env.SUPABASE_SERVICE_ROLE_KEY);
     },
   },
+  turn: {
+    /** Hostname only; TURN transport ports are controlled by the call API. */
+    get host() {
+      const host = required('TURN_HOST', process.env.TURN_HOST).trim().toLowerCase();
+      if (!/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(host)) {
+        throw new Error('TURN_HOST must be a valid hostname without a protocol, port, or path.');
+      }
+      return host;
+    },
+    /** Server-only coturn REST API shared secret. Never expose as NEXT_PUBLIC. */
+    get sharedSecret() {
+      const secret = required('TURN_SHARED_SECRET', process.env.TURN_SHARED_SECRET);
+      if (secret.length < 32) {
+        throw new Error('TURN_SHARED_SECRET must contain at least 32 characters.');
+      }
+      return secret;
+    },
+  },
   spotify: {
     get clientId() {
       return required('SPOTIFY_CLIENT_ID', process.env.SPOTIFY_CLIENT_ID);
@@ -100,6 +118,21 @@ export const env = {
     },
     get configured() {
       return !!(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
+    },
+  },
+  /**
+   * Decorative front-end media that is not part of any feature's data model.
+   * Client-safe (NEXT_PUBLIC only): reading these getters never touches a
+   * server secret, so they are safe to reference from client components.
+   */
+  media: {
+    /**
+     * Optional vertical "anti-boredom" gameplay clip shown beside the sign-up
+     * form. Point this at a CDN URL for instant delivery; when unset, the
+     * sign-up page renders no video (graceful, feature stays optional).
+     */
+    get signUpVideoUrl() {
+      return process.env.NEXT_PUBLIC_SIGNUP_VIDEO_URL ?? '';
     },
   },
   /**

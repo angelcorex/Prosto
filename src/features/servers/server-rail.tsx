@@ -64,7 +64,6 @@ export function ServerRail() {
   // server_id → active mute (muted_until in the future). Drives the dimmed
   // avatar and the "no plain-unread dot" behaviour.
   const [mutedServers, setMutedServers] = useState<Set<string>>(new Set());
-  const justReadRef = useRef<Set<string>>(new Set());
   const [menu, setMenu] = useState<{ server: ServerItem; x: number; y: number } | null>(null);
   const [folderMenu, setFolderMenu] = useState<{ folder: FolderItem; x: number; y: number } | null>(null);
   const [notifyFor, setNotifyFor] = useState<ServerItem | null>(null);
@@ -143,6 +142,7 @@ export function ServerRail() {
     // server_id (uuid) → muted? — we key the rail by public_id, so map via
     // the servers list (id → public_id) once both are loaded.
     const mutedIds = new Set<string>();      // server UUIDs currently muted
+    let unreadRequestId = 0;
     async function loadNotifySettings() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data } = await (sb as any).rpc('get_my_server_notify');
@@ -163,9 +163,10 @@ export function ServerRail() {
     // state (survives reloads). Muted servers keep their ping count (red badge)
     // but suppress plain unread (no white dot).
     async function loadUnreads() {
+      const requestId = ++unreadRequestId;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data } = await (sb as any).rpc('get_channel_unreads');
-      if (!active || !Array.isArray(data)) return;
+      if (!active || requestId !== unreadRequestId || !Array.isArray(data)) return;
       const agg: Record<string, { pings: number; hasUnread: boolean }> = {};
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       data.forEach((r: any) => {
@@ -208,6 +209,7 @@ export function ServerRail() {
     // notifications the server actually created (already settings-filtered).
     let unreadDebounce: ReturnType<typeof setTimeout> | null = null;
     const scheduleUnreads = () => {
+      unreadRequestId += 1;
       if (unreadDebounce) clearTimeout(unreadDebounce);
       unreadDebounce = setTimeout(() => { loadUnreads(); }, 400);
     };
@@ -223,7 +225,6 @@ export function ServerRail() {
         if (!pid) return;
         if (window.location.pathname.startsWith(`/s/${pid}`)) return;
         if (meRef.current && row.sender_id === meRef.current.id) return;
-        justReadRef.current.delete(pid);
         // Optimistic PLAIN-unread dot only (never a ping — that's settings-gated
         // and reconciled by the debounced refresh). Muted servers get no dot.
         const muted = !!servers.find((s) => s.public_id === pid && mutedIds.has(s.id));

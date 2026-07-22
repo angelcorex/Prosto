@@ -4,6 +4,7 @@
 export { AuthCard } from './components/auth-card';
 export { SignInForm } from './components/sign-in-form';
 export { SignUpForm } from './components/sign-up-form';
+export { SignUpVideo } from './components/sign-up-video';
 export { CodeLoginForm } from './components/code-login-form';
 export { ForgotPasswordForm } from './components/forgot-password-form';
 export { ResetPasswordForm } from './components/reset-password-form';

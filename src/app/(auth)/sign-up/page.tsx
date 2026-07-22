@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 
 import { getT } from '@/lib/i18n';
 import { createClient } from '@/lib/supabase/server';
-import { AuthCard, SignUpForm } from '@/features/auth';
+import { AuthCard, SignUpForm, SignUpVideo } from '@/features/auth';
 import { site } from '@/config';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -28,18 +28,22 @@ export default async function SignUpPage({
   const t = await getT('auth.signUp');
 
   return (
-    <AuthCard
-      title={t('title')}
-      footer={
-        <>
-          {t('hasAccount')}{' '}
-          <Link href={safeNext ? `${site.routes.signIn}?next=${encodeURIComponent(safeNext)}` : site.routes.signIn} className="font-medium text-link hover:underline">
-            {t('signIn')}
-          </Link>
-        </>
-      }
-    >
-      <SignUpForm next={safeNext} />
-    </AuthCard>
+    <div className="flex items-center justify-center gap-10 xl:gap-14">
+      <AuthCard
+        title={t('title')}
+        footer={
+          <>
+            {t('hasAccount')}{' '}
+            <Link href={safeNext ? `${site.routes.signIn}?next=${encodeURIComponent(safeNext)}` : site.routes.signIn} className="font-medium text-link hover:underline">
+              {t('signIn')}
+            </Link>
+          </>
+        }
+      >
+        <SignUpForm next={safeNext} />
+      </AuthCard>
+
+      <SignUpVideo />
+    </div>
   );
 }

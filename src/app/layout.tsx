@@ -6,7 +6,7 @@ import { AppProviders } from '@/providers';
 import { getLocale, getMessages, getT } from '@/lib/i18n';
 import { site, literalColors } from '@/config';
 import { DesktopTitlebar } from '@/features/desktop';
-import { PwaProvider } from '@/features/pwa';
+import { PwaProvider, ChunkReloadGuard } from '@/features/pwa';
 import 'remixicon/fonts/remixicon.css';
 import './globals.css';
 
@@ -154,6 +154,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <AppProviders messages={messages} locale={locale}>
           <DesktopTitlebar />
           <PwaProvider />
+          <ChunkReloadGuard />
           {children}
         </AppProviders>
       </body>

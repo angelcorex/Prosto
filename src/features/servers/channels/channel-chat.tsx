@@ -1,15 +1,14 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'next/navigation';
 import { Hash, Smile, Palette, Pin, Menu } from 'lucide-react';
 
 import { cn } from '@/lib/utils/cn';
 import { uploadLimitBytes, withAttachmentMeta, attachmentsOf } from '@/lib/utils/media';
-import { createClient } from '@/lib/supabase/client';
 import { useT } from '@/providers/i18n-provider';
-import { EmojiPicker, renderEmojiNodes } from '@/components/ui';
+import { ChatDaySeparator, EmojiPicker, isSameCalendarDay, renderEmojiNodes, useViewerTimeZone } from '@/components/ui';
 import { ReactionBar } from '@/components/ui/reaction-bar';
 import { preloadEmojiData } from '@/components/ui/emoji-picker';
 import { loadServerEmojis, resolveEmojiShortcodes } from '@/lib/emoji';
@@ -99,6 +98,7 @@ export function ChannelChat({
   const tm = useT('messages');
   const ts = useT('servers');
   const tr = useT('reactions');
+  const viewerTimeZone = useViewerTimeZone();
   const imageViewer = useImageViewer();
 
   // ── Timeout countdown ────────────────────────────────────────────────────
@@ -208,21 +208,102 @@ export function ChannelChat({
   }, [jumpParam, messages]);
 
   // ── Persistent per-channel read state (Discord-style) ────────────────────
-  // Mark read on open and on each new message while viewing, plus once on
-  // leave. A broadcast clears the ServerRail's badge for this channel/server
-  // immediately (no wait for its poll). Also clears the bell "mention"
-  // notifications tied to this channel so a viewed ping doesn't linger.
+  // Mark on open, whenever the latest rendered message changes, when a hidden
+  // tab becomes visible, and once more on visible navigation away. Requests are
+  // coalesced so realtime + safety-poll updates cannot race each other. Badge
+  // consumers reload only after the RPC commits; dispatching before completion
+  // allowed a stale get_channel_unreads response to restore the unread state.
+  const readBoundaryId = [...messages]
+    .reverse()
+    .find((message) => !message.id.startsWith('opt-'))?.id ?? null;
+  const readBoundaryIdRef = useRef(readBoundaryId);
+  const readVersionRef = useRef<string | null>(null);
+  const requestChannelReadRef = useRef<(() => void) | null>(null);
+  readBoundaryIdRef.current = readBoundaryId;
+
   useEffect(() => {
     if (!channelId) return;
     const sb = sbRef.current;
-    const markRead = () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (sb as any).rpc('mark_channel_read', { p_channel: channelId });
-      window.dispatchEvent(new CustomEvent('prosto:channel-read', { detail: { channelId } }));
+    let inFlight = false;
+    let queued = false;
+    let mounted = true;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    const currentVersion = () => `${channelId}:${readBoundaryIdRef.current ?? ''}`;
+
+    const scheduleRetry = () => {
+      if (!mounted || retryTimer) return;
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        markRead();
+      }, 1000);
     };
+
+    const markRead = () => {
+      // Messages delivered while the tab is hidden have not actually been read.
+      if (document.visibilityState !== 'visible') return;
+      const boundaryId = readBoundaryIdRef.current;
+      if (!boundaryId) return;
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+        retryTimer = null;
+      }
+      if (inFlight) {
+        queued = true;
+        return;
+      }
+
+      inFlight = true;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      void Promise.resolve((sb as any).rpc('mark_channel_read_through', {
+        p_channel: channelId,
+        p_message: boundaryId,
+      }))
+        .then(
+          ({ error }: { error?: unknown }) => {
+            if (error) {
+              scheduleRetry();
+              return;
+            }
+            window.dispatchEvent(new CustomEvent('prosto:channel-read', { detail: { channelId } }));
+          },
+          scheduleRetry,
+        )
+        .finally(() => {
+          inFlight = false;
+          if (!queued) return;
+          queued = false;
+          markRead();
+        });
+    };
+
+    requestChannelReadRef.current = markRead;
+    readVersionRef.current = currentVersion();
     markRead();
-    return () => { markRead(); };
-  }, [channelId, messages.length]);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return;
+      readVersionRef.current = currentVersion();
+      markRead();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      mounted = false;
+      if (retryTimer) clearTimeout(retryTimer);
+      // SPA navigation does not cancel this Supabase request; its success event
+      // reconciles the still-mounted rail/sidebar after the route has changed.
+      markRead();
+      if (requestChannelReadRef.current === markRead) requestChannelReadRef.current = null;
+    };
+  }, [channelId, sbRef]);
+
+  useEffect(() => {
+    const version = `${channelId}:${readBoundaryId ?? ''}`;
+    if (readVersionRef.current === version) return;
+    readVersionRef.current = version;
+    requestChannelReadRef.current?.();
+  }, [channelId, readBoundaryId]);
 
   // ── Composer state ───────────────────────────────────────────────────────
   const [replyTo, setReplyTo] = useState<ChannelMessage | null>(null);
@@ -527,12 +608,24 @@ export function ChannelChat({
             <p className="mt-1 text-[15px] text-muted-foreground">{ts('channelStart', { name: channelName })}</p>
           </div>
 
-          {messages.map((msg, i) => (
-            <div key={msg.id} data-mid={msg.id} className={cn(jumpId === msg.id && 'jump-highlight rounded-lg')}>
+          {messages.map((msg, i) => {
+            const prev = messages[i - 1];
+            const startsNewDay = !prev || !isSameCalendarDay(prev.created_at, msg.created_at, viewerTimeZone);
+            return (
+              <Fragment key={msg.id}>
+                {startsNewDay && (
+                  <ChatDaySeparator
+                    date={msg.created_at}
+                    locale={locale}
+                    timeZone={viewerTimeZone}
+                    todayLabel={tm('today')}
+                    yesterdayLabel={tm('yesterday')}
+                  />
+                )}
+                <div data-mid={msg.id} className={cn(jumpId === msg.id && 'jump-highlight rounded-lg')}>
             <MessageItem
-              key={msg.id}
               msg={msg}
-              prev={messages[i - 1]}
+              prev={startsNewDay ? undefined : prev}
               allMessages={messages}
               myId={myId}
               myName={myName}
@@ -569,8 +662,10 @@ export function ChannelChat({
               onOpenImage={(src, name, avatar, subtitle) => imageViewer.open({ src, authorName: name, authorAvatar: avatar ?? undefined, subtitle })}
               onJumpTo={jumpToChannelMessage}
             />
-            </div>
-          ))}
+                </div>
+              </Fragment>
+            );
+          })}
         </div>
       </div>
 
